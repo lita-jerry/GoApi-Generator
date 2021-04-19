@@ -190,7 +190,7 @@
 </template>
 <script>
 import MySql from './common/mysql.js'
-import { StringToBottomLine } from './common/string-fmt.js'
+import { HumpToBottomLine } from './common/string-fmt.js'
 import { GenerateDataBase, GenerateBeanStruct, GenerateCreateMethod, GenerateDeleteMethod, GenerateUpdateMethod, GenerateFindMethod } from './common/code-generator.js'
 export default {
   name: 'app',
@@ -246,18 +246,112 @@ export default {
 					function (data) {
 						if (data.Success) {
 							console.log(data.Result)
+							console.log(this.ToTableStruct(data.Result))
+						}
+					}.bind(this)
+		)
+		
+		MySql.Execute(
+					"106.12.128.72",
+					"root", 
+					"Cjm@12070817", 
+					"uepush", 
+					"show full columns from ue_users", 
+					function (data) {
+						if (data.Success) {
+							console.log(data.Result)
 						}
 					}
 		)
+		
 		this.addTableRow()
 	},
 	methods: {
+		ToTableStruct: function(rows) {
+			const result = []
+			for (let item of rows) {
+				const row = {}
+				let name = item.Field.replace(/\_(\w)/g, function(all, letter){ return letter.toUpperCase() })
+				row.name = name.slice(0,1).toUpperCase() + name.slice(1).toLowerCase()
+				row.table = item.Field
+				row.comment = item.Comment
+				row.isNotNull = (item.Null === 'NO')
+				row.unique = (item.Key === 'UNI') // 因为primaryKey 优先级比 unique高, 所以primaryKey 后赋值
+				row.primaryKey = (item.Key === 'PRI')
+				row.autoIncrement = (item.Extra === 'auto_increment')
+				row.default = item.Default
+				// 判断类型 Start
+				row.unsigned = false
+				row.dataLength = { isDefault: false, value: 0 }
+				const length = item.Type.match(/\(([^)]*)\)/) && item.Type.match(/\(([^)]*)\)/)[1]
+				if (item.Type.indexOf('datetime') != -1) {
+					row.type = 'time'
+					row.dataLength = { isDefault: !length, value: length }
+				} else if (item.Type === 'tinyint(1)') {
+					row.type = 'bool'
+					row.default = !!row.default
+				} else if (item.Type === 'longtext') {
+					row.type = 'string'
+				} else if (item.Type === 'float') {
+					row.type = 'float32'
+				} else if (item.Type === 'double') {
+					row.type = 'float64'
+				} else if (item.Type === 'tinyint(3) unsigned') {
+					row.type = 'byte'
+					row.unsigned = true
+				} else if (item.Type.indexOf('int') != -1 && item.Type.indexOf('unsigned') != -1) {
+					// uint类型
+					row.type = 'uint'
+					row.unsigned = true
+					switch (item.Type){
+						case 'bigint(20) unsigned':
+							row.type = 'uint64'
+							break;
+						case 'int(10) unsigned':
+							row.type = 'uint32'
+							break;
+						case 'smallint(5) unsigned':
+							row.type = 'uint16'
+							break;
+						case 'tinyint(3) unsigned':
+							row.type = 'uint8'
+							break;
+						default:
+							row.dataLength = { isDefault: !length, value: length }
+							break;
+					}
+				} else if (item.Type.indexOf('int') != -1 && item.Type.indexOf('unsigned') == -1) {
+					// int类型
+					row.type = 'int'
+					switch (item.Type){
+						case 'bigint(20)':
+							row.type = 'int64'
+							break;
+						case 'int(11)':
+							row.type = 'int32'
+							break;
+						case 'smallint(6)':
+							row.type = 'int16'
+							break;
+						case 'tinyint(4)':
+							row.type = 'int8'
+							break;
+						default:
+							row.dataLength = { isDefault: !length, value: length }
+							break;
+					}
+				}
+				// 判断类型 End
+			 result.push(row)
+			}
+			return result
+		},
 	  onExample: function() {
 	    this.className = 'UEAccount'
 	    this.listColumn = [
-	      { name: 'Name', table: StringToBottomLine('Name'), comment: '', type: 'string', isNotNull: true, dataLength: { isDefault: true, value: 0 }, primaryKey: true, autoIncrement: false, unsigned: false, unique: true, default: null },
-	      { name: 'RegistTime', table: StringToBottomLine('RegistTime'), comment: '', type: 'time', isNotNull: false, dataLength: { isDefault: true, value: 0 }, primaryKey: false, autoIncrement: false, unsigned: false, unique: false, default: null },
-	      { name: 'IsVIP', table: StringToBottomLine('IsVIP'), comment: '', type: 'bool', isNotNull: true, dataLength: { isDefault: false, value: 2 }, primaryKey: false, autoIncrement: false, unsigned: false, unique: false, default: false }
+	      { name: 'Name', table: HumpToBottomLine('Name'), comment: '', type: 'string', isNotNull: true, dataLength: { isDefault: true, value: 0 }, primaryKey: true, autoIncrement: false, unsigned: false, unique: true, default: null },
+	      { name: 'RegistTime', table: HumpToBottomLine('RegistTime'), comment: '', type: 'time', isNotNull: false, dataLength: { isDefault: true, value: 0 }, primaryKey: false, autoIncrement: false, unsigned: false, unique: false, default: null },
+	      { name: 'IsVIP', table: HumpToBottomLine('IsVIP'), comment: '', type: 'bool', isNotNull: true, dataLength: { isDefault: false, value: 2 }, primaryKey: false, autoIncrement: false, unsigned: false, unique: false, default: false }
 	    ]
 	    this.setDefaultFunctionByColumns()
 	    this.handleGenerateCode()
@@ -386,7 +480,7 @@ export default {
 	      json: this.listColumn.map(function(item) {
 	        return {
 	          key: item.name,
-	          json: StringToBottomLine(item.name),
+	          json: HumpToBottomLine(item.name),
 	          type: (item.type === 'time' ? 'time.Time' : item.type)
 	        }
 	      }.bind(this)),
@@ -402,7 +496,7 @@ export default {
 	      json: this.listColumn.map(function(item) {
 	        return {
 	          key: item.name,
-	          json: StringToBottomLine(item.name),
+	          json: HumpToBottomLine(item.name),
 	          type: (item.type === 'time' ? 'time.Time' : item.type)
 	        }
 	      }.bind(this)),
@@ -471,7 +565,7 @@ export default {
 	    if (event) {
 	      this.jsonBeanForm[beanIndex].json = '-'
 	    } else {
-	      this.jsonBeanForm[beanIndex].json = StringToBottomLine(this.jsonBeanForm[beanIndex].key)
+	      this.jsonBeanForm[beanIndex].json = HumpToBottomLine(this.jsonBeanForm[beanIndex].key)
 	    }
 	  },
 	  onEditCustomBeanDone: function() {

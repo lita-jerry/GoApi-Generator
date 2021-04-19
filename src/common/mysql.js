@@ -1,5 +1,5 @@
 module.exports = {
-	_internalCallback : function() { console.log("Callback not set")},
+		_internalCallback : function() { console.log("Callback not set")},
     Execute: function (Host, Username, Password, Database, Sql, Callback) {
         _internalCallback = Callback;
         // OVE-20191021-0001

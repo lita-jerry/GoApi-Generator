@@ -6,7 +6,7 @@
 */
 
 // 驼峰转下划线
-const StringToBottomLine = (str) => {
+const HumpToBottomLine = (str) => {
 	// let result = str.replace(/([A-Z])/g,"_$1").toLowerCase()
 	// 以上暴力转换 有很多问题 以下重写
 	// var splistCount = 0 // 本次切割长度
@@ -120,4 +120,4 @@ const ReplaceFormatString = (str, args) => {
 	return result.toString()
 }
 
-export { StringToBottomLine, MakeSameStringLength, ReplaceFormatString }
+export { HumpToBottomLine, MakeSameStringLength, ReplaceFormatString }
