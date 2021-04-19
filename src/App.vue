@@ -43,16 +43,14 @@
       </el-table-column>
       <el-table-column align="center" label="Length" width="220">
         <template slot-scope="scope">
-          <el-radio v-model="scope.row.dataLength.isDefault" :label="true">Default</el-radio>
-          <el-radio v-model="scope.row.dataLength.isDefault" :label="false">
-            <el-input-number
-              v-model="scope.row.dataLength.value"
-              label=""
-              :controls="false"
-              size="small"
-              style="width: 70px;"
-            />
-          </el-radio>
+          <el-input-number
+            v-model="scope.row.dataLength"
+            label=""
+            :controls="false"
+            size="small"
+            placeholder="0或空表示默认"
+            style="width: 70px;"
+          />
         </template>
       </el-table-column>
       <el-table-column align="center" label="PrimaryKey" width="100">
@@ -238,31 +236,34 @@ export default {
 	},
 	created: function() {
 		MySql.Execute(
-					"106.12.128.72",
-					"root", 
-					"Cjm@12070817", 
 					"uepush", 
-					"show full columns from data_type_tests", 
+					// "show full columns from data_type_tests", 
+          "show full columns from ue_users", 
+          // "show full columns from ue_admin_accounts", 
 					function (data) {
 						if (data.Success) {
 							console.log(data.Result)
-							console.log(this.ToTableStruct(data.Result))
+							// console.log(this.ToTableStruct(data.Result))
+              this.listColumn = this.ToTableStruct(data.Result)
+              console.log(this.listColumn)
+              this.setDefaultFunctionByColumns()
+              this.handleGenerateCode()
 						}
 					}.bind(this)
 		)
 		
-		MySql.Execute(
-					"106.12.128.72",
-					"root", 
-					"Cjm@12070817", 
-					"uepush", 
-					"show full columns from ue_users", 
-					function (data) {
-						if (data.Success) {
-							console.log(data.Result)
-						}
-					}
-		)
+		// MySql.Execute(
+		// 			"106.12.128.72",
+		// 			"root", 
+		// 			"Cjm@12070817", 
+		// 			"uepush", 
+		// 			"show full columns from ue_users", 
+		// 			function (data) {
+		// 				if (data.Success) {
+		// 					console.log(data.Result)
+		// 				}
+		// 			}
+		// )
 		
 		this.addTableRow()
 	},
@@ -272,7 +273,7 @@ export default {
 			for (let item of rows) {
 				const row = {}
 				let name = item.Field.replace(/\_(\w)/g, function(all, letter){ return letter.toUpperCase() })
-				row.name = name.slice(0,1).toUpperCase() + name.slice(1).toLowerCase()
+				row.name = name.slice(0,1).toUpperCase() + name.slice(1)
 				row.table = item.Field
 				row.comment = item.Comment
 				row.isNotNull = (item.Null === 'NO')
@@ -282,11 +283,11 @@ export default {
 				row.default = item.Default
 				// 判断类型 Start
 				row.unsigned = false
-				row.dataLength = { isDefault: false, value: 0 }
+				row.dataLength = 0
 				const length = item.Type.match(/\(([^)]*)\)/) && item.Type.match(/\(([^)]*)\)/)[1]
 				if (item.Type.indexOf('datetime') != -1) {
 					row.type = 'time'
-					row.dataLength = { isDefault: !length, value: length }
+					row.dataLength = length || 0
 				} else if (item.Type === 'tinyint(1)') {
 					row.type = 'bool'
 					row.default = !!row.default
@@ -317,7 +318,7 @@ export default {
 							row.type = 'uint8'
 							break;
 						default:
-							row.dataLength = { isDefault: !length, value: length }
+							row.dataLength = length || 0
 							break;
 					}
 				} else if (item.Type.indexOf('int') != -1 && item.Type.indexOf('unsigned') == -1) {
@@ -337,10 +338,13 @@ export default {
 							row.type = 'int8'
 							break;
 						default:
-							row.dataLength = { isDefault: !length, value: length }
+							row.dataLength = length || 0
 							break;
 					}
-				}
+				} else if (item.Type.indexOf('varchar') != -1) {
+          row.type = 'string'
+          row.dataLength = length || 0
+        }
 				// 判断类型 End
 			 result.push(row)
 			}
@@ -349,9 +353,9 @@ export default {
 	  onExample: function() {
 	    this.className = 'UEAccount'
 	    this.listColumn = [
-	      { name: 'Name', table: HumpToBottomLine('Name'), comment: '', type: 'string', isNotNull: true, dataLength: { isDefault: true, value: 0 }, primaryKey: true, autoIncrement: false, unsigned: false, unique: true, default: null },
-	      { name: 'RegistTime', table: HumpToBottomLine('RegistTime'), comment: '', type: 'time', isNotNull: false, dataLength: { isDefault: true, value: 0 }, primaryKey: false, autoIncrement: false, unsigned: false, unique: false, default: null },
-	      { name: 'IsVIP', table: HumpToBottomLine('IsVIP'), comment: '', type: 'bool', isNotNull: true, dataLength: { isDefault: false, value: 2 }, primaryKey: false, autoIncrement: false, unsigned: false, unique: false, default: false }
+	      { name: 'Name', table: HumpToBottomLine('Name'), comment: '', type: 'string', isNotNull: true, dataLength: 0, primaryKey: true, autoIncrement: false, unsigned: false, unique: true, default: null },
+	      { name: 'RegistTime', table: HumpToBottomLine('RegistTime'), comment: '', type: 'time', isNotNull: false, dataLength: 0, primaryKey: false, autoIncrement: false, unsigned: false, unique: false, default: null },
+	      { name: 'IsVIP', table: HumpToBottomLine('IsVIP'), comment: '', type: 'bool', isNotNull: true, dataLength: 2, primaryKey: false, autoIncrement: false, unsigned: false, unique: false, default: false }
 	    ]
 	    this.setDefaultFunctionByColumns()
 	    this.handleGenerateCode()
@@ -412,10 +416,7 @@ export default {
 	      comment: '',
 	      type: 'string',
 	      isNotNull: false,
-	      dataLength: {
-	        isDefault: true,
-	        value: 0
-	      },
+	      dataLength: 0,
 	      primaryKey: false,
 	      autoIncrement: false,
 	      unsigned: false,

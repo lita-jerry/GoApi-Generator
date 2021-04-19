@@ -28,12 +28,12 @@ const GenerateDataBase = (className, useGormModel, columns) => {
 		column.push(type)
 		// 注释部分
 		let comment = ''
-		comment += `\`gorm:"` // 注释开始
+		// 注释开始
 		if (item.primaryKey) {
 			comment += `primaryKey; `
 		}
-		if (!item.dataLength.isDefault) {
-			comment += `size:` + item.dataLength.value + `; `
+		if (item.dataLength > 0 && (item.type==='string'||item.type==='int'||item.type==='uint')) {
+			comment += `size:` + item.dataLength + `; `
 		}
 		if (item.isNotNull) {
 			comment += `not null; `
@@ -54,8 +54,14 @@ const GenerateDataBase = (className, useGormModel, columns) => {
 		if (item.comment) {
 			comment += `comment:` + item.comment + `; `
 		}
-		comment += `"\`` // 注释结尾
-		column.push(comment)
+    if (comment.length > 0) {
+      if (comment[comment.length - 1] === ' ') {
+        comment = comment.slice(0, comment.length - 1)
+      }
+      comment += `\`gorm:"` + comment + `"\``,
+      column.push(comment)
+    }
+    // 注释结尾
 		rows.push(column)
 	}
 
