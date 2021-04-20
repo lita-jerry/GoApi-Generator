@@ -58,8 +58,7 @@ const GenerateDataBase = (className, useGormModel, columns) => {
       if (comment[comment.length - 1] === ' ') {
         comment = comment.slice(0, comment.length - 1)
       }
-      comment += `\`gorm:"` + comment + `"\``,
-      column.push(comment)
+      column.push(`\`gorm:"` + comment + `"\``)
     }
     // 注释结尾
 		rows.push(column)

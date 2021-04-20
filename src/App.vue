@@ -295,7 +295,6 @@ export default {
 				"show full columns from " + this.mysqlTableName, 
 				function (data) {
 					if (data.Success) {
-						console.log(data.Result)
 						this.isLoadingTableColumns = false
 						let className = this.mysqlTableName.replace(/\_(\w)/g, function(all, letter){ return letter.toUpperCase() })
 						this.className = className.slice(0,1).toUpperCase() + className.slice(1)
@@ -315,7 +314,7 @@ export default {
 					|| _.isEqual(item, {Collation: null,Comment: "",Default: null,Extra: "",Field: "deleted_at",Key: "MUL",Null: "YES",Privileges: "select,insert,update,references",Type: "datetime(3)"}))
 			})
 			this.useGormModel = true
-			if ((rows.length - filteList.length) != 3) {
+			if ((rows.length - filteList.length) != 4) {
 				filteList = rows
 				this.useGormModel = false
 			}
