@@ -8,6 +8,8 @@
       <el-checkbox v-model="isGORMDebug" style="margin-left: 10px;">Open Gorm Debug</el-checkbox>
       <el-button type="primary" class="btn-action" @click="onImportConfig()">Import</el-button>
       <el-button type="success" class="btn-action" @click="onExportConfig()">Export</el-button>
+			<el-button type="warning" class="btn-action" @click="dialogLinkMySQL=true">Import MySQL</el-button>
+			
       <div style="flex: 1;"></div>
       <el-button type="warning" class="btn-action" @click="onExample()">Example</el-button>
       <el-button type="warning" class="btn-action">Reset</el-button>
@@ -172,7 +174,8 @@
         <el-button type="primary" @click="onEditCustomBeanDone()">确 定</el-button>
       </div>
     </el-dialog>
-    <el-dialog title="Generator Code" :visible.sync="dialogCodeVisible">
+		<!-- 生成后的代码内容 -->
+    <el-dialog title="Generator Code" :visible.sync="dialogCodeVisible" width="90%" :fullscreen="false" :close-on-click-modal="false">
       <el-input
         type="textarea"
         :rows="20"
@@ -184,12 +187,28 @@
         <el-button type="primary" @click="onCopyAndClose()">Copy And Close</el-button>
       </span>
     </el-dialog>
+		<!-- 连接数据库 -->
+		<el-dialog title="Link MySQL" :visible.sync="dialogLinkMySQL" :close-on-click-modal="false">
+		  <el-input v-model="mysqlIp" placeholder="数据库ip,端口必须为3306" style="margin-top: 15px;"></el-input>
+			<el-input v-model="mysqlAccount" placeholder="数据库用户名" style="margin-top: 15px;"></el-input>
+			<el-input v-model="mysqlPassword" placeholder="数据库密码" style="margin-top: 15px;"></el-input>
+			<el-input v-model="mysqlDatabase" placeholder="数据库名" style="margin-top: 15px;"></el-input>
+		  <el-button type="primary" @click="onLinkMySQL()" :loading="isLoadingTables" style="margin-top: 15px;">Link</el-button>
+			<el-select v-model="mysqlTableName" style="margin-top: 15px; margin-left: 15px;" placeholder="Please select table">
+			  <el-option :label="item" :value="item" v-for="(item,index) in listOfMySQLTable" :key="index" />
+			</el-select>
+		  <span slot="footer" class="dialog-footer">
+		    <el-button @click="dialogLinkMySQL=false">Close</el-button>
+		    <el-button type="primary" @click="onLoadTableColumns()" :loading="isLoadingTableColumns" :disabled="!mysqlTableName">Use Table</el-button>
+		  </span>
+		</el-dialog>
   </div>
 </template>
 <script>
 import MySql from './common/mysql.js'
 import { HumpToBottomLine } from './common/string-fmt.js'
 import { GenerateDataBase, GenerateBeanStruct, GenerateCreateMethod, GenerateDeleteMethod, GenerateUpdateMethod, GenerateFindMethod } from './common/code-generator.js'
+import _, { map } from 'underscore';
 export default {
   name: 'app',
 	data: function() {
@@ -198,6 +217,16 @@ export default {
 			dialogCustomBeanVisible: false,
 			jsonBeanForm: [],
 			jsonBeanFuncIndex: 0, // 当前正在编辑的函数
+			// MySQL
+			dialogLinkMySQL: false,
+			mysqlIp: '106.12.128.72',
+			mysqlAccount: 'root',
+			mysqlPassword: 'Cjm@12070817',
+			mysqlDatabase: 'uepush',
+			isLoadingTables: false,
+			isLoadingTableColumns: false,
+			listOfMySQLTable: [],
+			mysqlTableName: null,
 			// Other
 			className: '',
 			useGormModel: false,
@@ -235,42 +264,63 @@ export default {
 		}
 	},
 	created: function() {
-		MySql.Execute(
-					"uepush", 
-					// "show full columns from data_type_tests", 
-          "show full columns from ue_users", 
-          // "show full columns from ue_admin_accounts", 
-					function (data) {
-						if (data.Success) {
-							console.log(data.Result)
-							// console.log(this.ToTableStruct(data.Result))
-              this.listColumn = this.ToTableStruct(data.Result)
-              console.log(this.listColumn)
-              this.setDefaultFunctionByColumns()
-              this.handleGenerateCode()
-						}
-					}.bind(this)
-		)
-		
-		// MySql.Execute(
-		// 			"106.12.128.72",
-		// 			"root", 
-		// 			"Cjm@12070817", 
-		// 			"uepush", 
-		// 			"show full columns from ue_users", 
-		// 			function (data) {
-		// 				if (data.Success) {
-		// 					console.log(data.Result)
-		// 				}
-		// 			}
-		// )
-		
 		this.addTableRow()
 	},
 	methods: {
+		// MySQL
+		onLinkMySQL: function() {
+			this.isLoadingTables = true
+			MySql.Execute(
+				this.mysqlIp,
+				this.mysqlAccount,
+				this.mysqlPassword,
+				this.mysqlDatabase,
+				'show tables',
+				function (data) {
+					if (data.Success) {
+						this.isLoadingTables = false
+						this.mysqlTableName = null
+						this.listOfMySQLTable = data.Result.map((item) => item.Tables_in_uepush)
+					}
+				}.bind(this)
+			)
+		},
+		onLoadTableColumns: function() {
+			this.isLoadingTableColumns = true
+			MySql.Execute(
+				this.mysqlIp,
+				this.mysqlAccount,
+				this.mysqlPassword,
+				this.mysqlDatabase,
+				"show full columns from " + this.mysqlTableName, 
+				function (data) {
+					if (data.Success) {
+						console.log(data.Result)
+						this.isLoadingTableColumns = false
+						let className = this.mysqlTableName.replace(/\_(\w)/g, function(all, letter){ return letter.toUpperCase() })
+						this.className = className.slice(0,1).toUpperCase() + className.slice(1)
+						this.listColumn = this.ToTableStruct(data.Result)
+						this.dialogLinkMySQL = false
+						// this.setDefaultFunctionByColumns()
+						// this.handleGenerateCode()
+					}
+				}.bind(this)
+	)
+		},
 		ToTableStruct: function(rows) {
+			var filteList = rows.filter((item) => {
+				return !(_.isEqual(item, {Collation: null,Comment: "",Default: null,Extra: "auto_increment",Field: "id",Key: "PRI",Null: "NO",Privileges: "select,insert,update,references",Type: "bigint(20) unsigned"})
+					|| _.isEqual(item, {Collation: null,Comment: "",Default: null,Extra: "",Field: "created_at",Key: "",Null: "YES",Privileges: "select,insert,update,references",Type: "datetime(3)"})
+					|| _.isEqual(item, {Collation: null,Comment: "",Default: null,Extra: "",Field: "updated_at",Key: "",Null: "YES",Privileges: "select,insert,update,references",Type: "datetime(3)"})
+					|| _.isEqual(item, {Collation: null,Comment: "",Default: null,Extra: "",Field: "deleted_at",Key: "MUL",Null: "YES",Privileges: "select,insert,update,references",Type: "datetime(3)"}))
+			})
+			this.useGormModel = true
+			if ((rows.length - filteList.length) != 3) {
+				filteList = rows
+				this.useGormModel = false
+			}
 			const result = []
-			for (let item of rows) {
+			for (let item of filteList) {
 				const row = {}
 				let name = item.Field.replace(/\_(\w)/g, function(all, letter){ return letter.toUpperCase() })
 				row.name = name.slice(0,1).toUpperCase() + name.slice(1)
@@ -545,7 +595,6 @@ export default {
 	        this.codeString += GenerateFindMethod(item, this.className, this.isGORMDebug) + `\n`
 	      }
 	    }
-	    console.log(this.codeString)
 	    this.dialogCodeVisible = true
 	  },
 	  // 复制并关闭生成后的代码
