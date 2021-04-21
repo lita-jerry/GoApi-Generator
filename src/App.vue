@@ -316,7 +316,7 @@ export default {
 					if (data.Success) {
 						this.isLoadingTables = false
 						this.mysqlTableName = null
-						this.listOfMySQLTable = data.Result.map((item) => item.Tables_in_uepush)
+						this.listOfMySQLTable = data.Result.map((item) => item['Tables_in_' + this.mysqlDatabase])
 					}
 				}.bind(this)
 			)
