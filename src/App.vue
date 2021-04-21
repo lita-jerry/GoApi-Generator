@@ -103,9 +103,20 @@
           <el-input-number v-if="['int','int8','int16','int32','int64','float32','float64','byte','rune'].indexOf(scope.row.type) != -1" v-model="scope.row.default" label="" :controls="false" />
         </template>
       </el-table-column>
-      <el-table-column fixed="right" label="Actions" align="center" width="160">
+      <el-table-column fixed="right" label="Actions" align="center" width="240">
         <template slot-scope="scope">
-          <el-button slot="reference" size="mini" type="primary">Copy</el-button>
+					<el-button
+						slot="reference"
+						size="mini"
+						type="primary"
+						@click="addTableRow(scope.$index)"
+					>Add</el-button>
+          <el-button
+						slot="reference"
+						size="mini"
+						type="primary"
+						@click="copyTableRow(scope.$index)"
+					>Copy</el-button>
           <el-button
             slot="reference"
             :disabled="listColumn.length <= 1"
@@ -118,7 +129,9 @@
     </el-table>
     
     <div style="margin-left: 10px; margin-top: 20px">
-      <el-button type="primary" @click="addTableRow()">Add Row</el-button>
+      <el-button type="primary" @click="addFunction()">Add Function</el-button>
+			<el-button type="primary" @click="setDefaultFunctionByColumns()">Default Function</el-button>
+			<el-button type="danger" @click="clearFunctions()">Clear Functions</el-button>
       <el-button type="primary" @click="handleGenerateCode()">Generate Code (⌘+⏎)</el-button>
     </div>
     
@@ -157,6 +170,29 @@
           <el-button type="primary" icon="el-icon-edit" round :disabled="scope.row.type != 3" @click="onEditCustomBean(scope.row, scope.$index)">{{ scope.row.isCustomBean ? 'Edit' : 'Set' }}</el-button>
         </template>
       </el-table-column>
+			<el-table-column fixed="right" label="Actions" align="center" width="240">
+			  <template slot-scope="scope">
+					<el-button
+						slot="reference"
+						size="mini"
+						type="primary"
+						@click="addFunction(scope.$index)"
+					>Add</el-button>
+			    <el-button
+						slot="reference"
+						size="mini"
+						type="primary"
+						@click="copyFunction(scope.$index)"
+					>Copy</el-button>
+			    <el-button
+			      slot="reference"
+			      :disabled="listColumn.length <= 1"
+			      size="mini"
+			      type="danger"
+			      @click="removeFunction(scope.$index)"
+			    >X</el-button>
+			  </template>
+			</el-table-column>
     </el-table>
     <!-- 弹窗 自定义相应Bean -->
     <el-dialog title="Custom Bean" :visible.sync="dialogCustomBeanVisible">
@@ -226,7 +262,7 @@ export default {
 			isLoadingTables: false,
 			isLoadingTableColumns: false,
 			listOfMySQLTable: [],
-			mysqlTableName: null,
+			mysqlTableName: 'ue_users',
 			// Other
 			className: '',
 			useGormModel: false,
@@ -304,7 +340,7 @@ export default {
 						// this.handleGenerateCode()
 					}
 				}.bind(this)
-	)
+			)
 		},
 		ToTableStruct: function(rows) {
 			var filteList = rows.filter((item) => {
@@ -459,8 +495,8 @@ export default {
 			var FileSaver = require('file-saver');
 	    FileSaver.saveAs(blob, this.className + '.json')
 	  },
-	  addTableRow: function() {
-	    this.listColumn.push({
+	  addTableRow: function(index) {
+			const val = {
 	      name: '',
 	      comment: '',
 	      type: 'string',
@@ -471,8 +507,41 @@ export default {
 	      unsigned: false,
 	      unique: false,
 	      default: null
-	    })
+	    }
+			if (index > 0) {
+				this.listColumn.splice(index+1, 0, val)
+			} else {
+				this.listColumn.push(val)
+			}
 	  },
+		// 添加方法
+		addFunction(index) {
+			const val = {
+			  type: 0,
+			  name: '',
+			  where: null,
+			  multiple: false,
+			  isCustomBean: false,
+			  json: [],
+			  isPaging: false,
+			  comment: ''
+			}
+			if (index > 0) {
+				this.listFunction.splice(index+1, 0, val)
+			} else {
+				this.listFunction.push(val)
+			}
+		},
+		copyFunction(index) {
+			const item = this.listFunction[index]
+			this.listFunction.splice(index, 0, item)
+		},
+		removeFunction(index) {
+			this.listFunction.splice(index, 1)
+		},
+		clearFunctions() {
+			this.listFunction = []
+		},
 	  // 根据字段设置默认方法
 	  setDefaultFunctionByColumns: function() {
 	    this.listFunction = []
@@ -560,6 +629,10 @@ export default {
 	
 	    // 根据方法列表生成bean
 	  },
+		copyTableRow: function(index) {
+			const item = this.listColumn[index]
+			this.listColumn.splice(index, 0, item)
+		},
 	  removeTableRow: function(index) {
 	    this.listColumn.splice(index, 1)
 	  },
