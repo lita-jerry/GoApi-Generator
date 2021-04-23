@@ -29,6 +29,9 @@ const GenerateDataBase = (className, useGormModel, columns) => {
 		// 注释部分
 		let comment = ''
 		// 注释开始
+		if (item.table) {
+			comment += `column:` + item.table + `; `
+		}
 		if (item.primaryKey) {
 			comment += `primaryKey; `
 		}

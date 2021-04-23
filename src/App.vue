@@ -498,6 +498,7 @@ export default {
 	  addTableRow: function(index) {
 			const val = {
 	      name: '',
+				table: null,
 	      comment: '',
 	      type: 'string',
 	      isNotNull: false,
