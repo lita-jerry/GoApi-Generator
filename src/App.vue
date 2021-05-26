@@ -194,7 +194,22 @@
 			  </template>
 			</el-table-column>
     </el-table>
-    <!-- 弹窗 自定义相应Bean -->
+		<!-- 弹窗 api请求参数 -->
+		<el-dialog title="api请求参数" :visible.sync="dialogParamsBeanVisible">
+		  <el-form>
+		    <el-form-item label-width="120px" v-for="(item,index) in jsonBeanForm" :key="index" :label="item.key" >
+		      <div class="flex-row flex-align-center" style="display: flex; flex-direction: row; align-items: center;">
+		        <el-input v-model="item.json" autocomplete="off" style="width: 220px;"></el-input>
+		        <el-checkbox :value="item.json==='-'" style="margin-left: 20px;" @change="onVisibleBeanItem($event, index)">Visible</el-checkbox>
+		      </div>
+		    </el-form-item>
+		  </el-form>
+		  <div slot="footer" class="dialog-footer">
+		    <el-button @click="dialogParamsBeanVisible = false">取 消</el-button>
+		    <el-button type="primary" @click="onEditCustomBeanDone()">确 定</el-button>
+		  </div>
+		</el-dialog>
+    <!-- 弹窗 自定义响应Bean -->
     <el-dialog title="Custom Bean" :visible.sync="dialogCustomBeanVisible">
       <!-- :model="jsonBeanForm" -->
       <el-form>
@@ -238,12 +253,32 @@
 		    <el-button type="primary" @click="onLoadTableColumns()" :loading="isLoadingTableColumns" :disabled="!mysqlTableName">Use Table</el-button>
 		  </span>
 		</el-dialog>
+		<!-- 操作条件 -->
+		<!-- api接口(参数结构、参数校验、数据操作条件) ←→ Model层封装方法(自动) ←→ 数据结构 -->
+		<!-- 增 参数结构、参数校验、Model层调用 -->
+		<!-- 删 参数结构、参数校验、条件生成、Model层调用 -->
+		<!-- 改 参数结构、参数校验、条件生成、Model层调用 -->
+		<!-- 查 参数结构、参数校验、条件生成、Model层调用 -->
+		<!-- 
+		设计业务层请求function，并添加校验规则、Where条件生成、json结构定义
+		github.com/json-iterator/go
+		 -->
   </div>
 </template>
 <script>
 import MySql from './common/mysql.js'
 import { HumpToBottomLine } from './common/string-fmt.js'
-import { GenerateDataBase, GenerateBeanStruct, GenerateCreateMethod, GenerateDeleteMethod, GenerateUpdateMethod, GenerateFindMethod } from './common/code-generator.js'
+import { 
+	GenerateDataBase, 
+	GenerateBeanStruct, 
+	GenerateModelCreateMethod, 
+	GenerateModelDeleteMethod, 
+	GenerateModelUpdateMethod, 
+	GenerateModelFindMethod, 
+	GenerateCreateMethod, 
+	GenerateDeleteMethod, 
+	GenerateUpdateMethod, 
+	GenerateFindMethod } from './common/code-generator.js'
 import _, { map } from 'underscore';
 export default {
   name: 'app',
@@ -253,6 +288,10 @@ export default {
 			dialogCustomBeanVisible: false,
 			jsonBeanForm: [],
 			jsonBeanFuncIndex: 0, // 当前正在编辑的函数
+			// api请求参数弹窗
+			dialogParamsBeanVisible: false,
+			paramsBeanForm: [],
+			paramsBeanFuncIndex: 0, // 当前正在编辑的函数
 			// MySQL
 			dialogLinkMySQL: false,
 			mysqlIp: '106.12.128.72',
@@ -292,7 +331,7 @@ export default {
 			],
 	
 			listColumn: [], // 数据库表字段
-			listFunction: [],
+			listFunction: [], // 逻辑方法
 	
 			dialogCodeVisible: false, // 显示生成后的代码
 			codeString: `` // 生成后的代码
@@ -624,12 +663,6 @@ export default {
 	      comment: '根据条件查找多条数据'
 	    })
 	  },
-	  // 根据字段设置默认json和bean
-	  setDefaultJsonBeanByColumns: function() {
-	    // 生成数据库bean
-	
-	    // 根据方法列表生成bean
-	  },
 		copyTableRow: function(index) {
 			const item = this.listColumn[index]
 			this.listColumn.splice(index, 0, item)
@@ -651,23 +684,51 @@ export default {
 	  },
 	  handleGenerateCode: function() {
 	    this.codeString = ``
-	    // 表结构
+	    // 表结构生成
+			this.codeString += '/* --------======== 表结构 ========-------- */\n'
 	    this.codeString += GenerateDataBase(this.className, true, this.listColumn) + `\n`
-	    // 根据方法生成
-	    for (const item of this.listFunction) {
-	      if (item.type === 0) {
-	        this.codeString += GenerateCreateMethod(item, this.className, this.isGORMDebug) + `\n`
-	      }
-	      if (item.type === 1) {
-	        this.codeString += GenerateDeleteMethod(item, this.className, this.isGORMDebug) + `\n`
-	      }
-	      if (item.type === 2) {
-	        this.codeString += GenerateUpdateMethod(item, this.className, this.isGORMDebug) + `\n`
-	      }
-	      if (item.type === 3) {
-	        this.codeString += GenerateFindMethod(item, this.className, this.isGORMDebug) + `\n`
-	      }
-	    }
+			
+	    // Model方法生成
+			this.codeString += '/* --------======== Model方法 ========-------- */\n'
+			// 增
+			this.codeString += GenerateModelCreateMethod(
+				{ type: 0, name: 'Insert', where: null, multiple: false, isCustomBean: false, json: [], isPaging: false, comment: '添加单条数据' }, 
+				this.className, this.isGORMDebug) + `\n`
+			this.codeString += GenerateModelCreateMethod(
+				{ type: 0, name: 'InsertList', where: null, multiple: true, isCustomBean: false, json: [], isPaging: false, comment: '添加多条数据' }, 
+				this.className, this.isGORMDebug) + `\n`
+			// 删
+			this.codeString += GenerateModelDeleteMethod(
+				{ type: 1, name: 'Delete', where: [], multiple: false, isCustomBean: false, json: [], isPaging: false, comment: '根据条件删除数据' }, 
+				this.className, this.isGORMDebug) + `\n`
+			// 改
+			this.codeString += GenerateModelUpdateMethod(
+				{ type: 2, name: 'Save', where: [], multiple: true, isCustomBean: false, json: [], isPaging: false, comment: '根据条件修改数据' }, 
+				this.className, this.isGORMDebug) + `\n`
+			// 查
+			this.codeString += GenerateModelFindMethod(
+				{ type: 3, name: 'GetDetail', where: [], multiple: false, isCustomBean: false, json: [], isPaging: false, comment: '根据条件查找单条数据' }, 
+				this.className, this.isGORMDebug) + `\n`
+			this.codeString += GenerateModelFindMethod(
+				{ type: 3, name: 'Find', where: [], multiple: true, isCustomBean: false, json: [], isPaging: false, comment: '根据条件查找多条数据' }, 
+				this.className, this.isGORMDebug) + `\n`
+				
+			// 接口方法生成
+			this.codeString += '/* --------======== 接口方法 ========-------- */\n'
+			for (const item of this.listFunction) {
+			  if (item.type === 0) {
+			    this.codeString += GenerateCreateMethod(item, this.className, this.isGORMDebug) + `\n`
+			  }
+			  if (item.type === 1) {
+			    this.codeString += GenerateDeleteMethod(item, this.className, this.isGORMDebug) + `\n`
+			  }
+			  if (item.type === 2) {
+			    this.codeString += GenerateUpdateMethod(item, this.className, this.isGORMDebug) + `\n`
+			  }
+			  if (item.type === 3) {
+			    this.codeString += GenerateFindMethod(item, this.className, this.isGORMDebug) + `\n`
+			  }
+			}
 	    this.dialogCodeVisible = true
 	  },
 	  // 复制并关闭生成后的代码
@@ -679,11 +740,23 @@ export default {
 	      this.$message.error('Can not copy: browser does not support')
 	    }.bind(this))
 	  },
-	  onEditCustomBean: function(data, funcIndex) {
-	    this.jsonBeanForm = data.json
-	    this.jsonBeanFuncIndex = funcIndex
-	    this.dialogCustomBeanVisible = true
+	  onEditParamsBean: function(data, funcIndex) {
+	    this.paramsBeanForm = data.params
+	    this.paramsBeanFuncIndex = funcIndex
+	    this.dialogParamsBeanVisible = true
 	  },
+		onEditCustomBean: function(data, funcIndex) {
+		  this.jsonBeanForm = data.json
+		  this.jsonBeanFuncIndex = funcIndex
+		  this.dialogCustomBeanVisible = true
+		},
+		onVisibleParamItem: function(event, paramIndex) {
+		  if (event) {
+		    this.paramsBeanForm[paramIndex].params = '-'
+		  } else {
+		    this.paramsBeanForm[paramIndex].params = HumpToBottomLine(this.paramsBeanForm[paramIndex].key)
+		  }
+		},
 	  onVisibleBeanItem: function(event, beanIndex) {
 	    if (event) {
 	      this.jsonBeanForm[beanIndex].json = '-'
@@ -691,6 +764,10 @@ export default {
 	      this.jsonBeanForm[beanIndex].json = HumpToBottomLine(this.jsonBeanForm[beanIndex].key)
 	    }
 	  },
+		onEditParamsBeanDone: function() {
+		  this.dialogParamsBeanVisible = false
+		  this.listFunction[this.paramsBeanFuncIndex].params = this.paramsBeanForm
+		},
 	  onEditCustomBeanDone: function() {
 	    this.dialogCustomBeanVisible = false
 	    this.listFunction[this.jsonBeanFuncIndex].json = this.jsonBeanForm

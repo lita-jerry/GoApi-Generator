@@ -101,6 +101,101 @@ const GenerateBeanStruct = (name, rows, comment) => {
 	return result
 }
 
+// 增删改查 Model方法 Start
+
+const GenerateModelCreateMethod = (funcVal, className, debug) => {
+	var result = ''
+
+	if (funcVal.multiple) {
+		result =
+			`\/\/ {comment}\n` +
+			`func {func}(datas []{bean}) (rowsAffected int64, err error) {\n` +
+			`    result := db{debug}.Create(&datas)\n` +
+			`    return result.RowsAffected, result.Error\n` +
+			`}`
+	} else {
+		result =
+			`\/\/ {comment}\n` +
+			`func (data {bean}) {func}() (rowsAffected int64, err error) {\n` +
+			`    result := db{debug}.Create(&data)\n` +
+			`    return result.RowsAffected, result.Error\n` +
+			`}`
+	}
+
+	result = ReplaceFormatString(result, {
+		debug: debug ? '.Debug()' : '',
+		func: funcVal.name,
+		bean: className,
+		comment: funcVal.comment
+	})
+
+	return result
+}
+
+const GenerateModelDeleteMethod = (funcVal, className, debug) => {
+	var result =
+		`\/\/ {comment}\n` +
+		`func (data {bean}) {func}(query interface{}, args ...interface{}) (rowsAffected int64, err error) {\n` +
+		`    result := db{debug}.Where(query, args).Delete(&data)\n` +
+		`    return result.RowsAffected, result.Error\n` +
+		`}`
+
+	result = ReplaceFormatString(result, {
+		debug: debug ? '.Debug()' : '',
+		func: funcVal.name,
+		bean: className,
+		comment: funcVal.comment
+	})
+	return result
+}
+
+const GenerateModelUpdateMethod = (funcVal, className, debug) => {
+	var result =
+		`\/\/ {comment}\n` +
+		`func (data {bean}) {func}(query interface{}, args ...interface{}) (rowsAffected int64, err error) {\n` +
+		`    result := db{debug}.Model({bean}{}).Where(query, args).Updates(data)\n` +
+		`    return result.RowsAffected, result.Error\n` +
+		`}`
+	result = ReplaceFormatString(result, {
+		debug: debug ? '.Debug()' : '',
+		func: funcVal.name,
+		bean: className,
+		comment: funcVal.comment
+	})
+	return result
+}
+
+const GenerateModelFindMethod = (funcVal, className, debug) => {
+	var result = ''
+	if (funcVal.multiple) {
+		result +=
+			`\/\/ {comment}\n` +
+			`func {func}(query interface{}, args ...interface{}) (res {bean}) {\n` +
+			`    db{debug}.Where(query, args).Model(&{bean}{}).Find(&res)\n` +
+			`    return res\n` +
+			`}`
+	} else {
+		result +=
+			`\/\/ {comment}\n` +
+			`func {func}(query interface{}, args ...interface{}) (res {bean}) {\n` +
+			`    db{debug}.Where(query, args).Model(&{bean}{}).First(&res)\n` +
+			`    return res\n` +
+			`}`
+	}
+
+
+	result = ReplaceFormatString(result, {
+		debug: debug ? '.Debug()' : '',
+		func: funcVal.name,
+		bean: className,
+		comment: funcVal.comment
+	})
+
+	return result
+}
+
+// 增删改查 Model方法 End
+
 // 增删改查 方法 Start
 
 const GenerateCreateMethod = (funcVal, className, debug) => {
@@ -203,6 +298,12 @@ const GenerateFindMethod = (funcVal, className, debug) => {
 
 export { GenerateDataBase,
 				 GenerateBeanStruct,
+				 
+				 GenerateModelCreateMethod,
+				 GenerateModelDeleteMethod,
+				 GenerateModelUpdateMethod,
+				 GenerateModelFindMethod,
+				 
 				 GenerateCreateMethod,
 				 GenerateDeleteMethod,
 				 GenerateUpdateMethod,
